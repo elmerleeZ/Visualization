@@ -1,0 +1,257 @@
+---
+title: "Poverty and Income Distribution - An Analysis of Argentina and Paraguay"
+author: "Elmer Zongyang Li"
+date: "August 24, 2017"
+output:
+  pdf_document:
+    highlight: tango
+    latex_engine: xelatex
+  html_document: default
+sansfont: Times New Roman
+---
+
+
+\begin{center} This is a R produced pdf file \end{center}
+***
+```{r chuck-opts, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+# Set useful functions
+
+`%S%` <- function(x, y) {
+  paste0(x, y)
+}
+
+`%notin%` <- Negate(`%in%`)
+
+# Install packages if needed
+package_list <- c("knitr", "haven", "labelled", "WDI", "tidyverse","reshape2", "plotly","extrafont")
+new_packages <- package_list[package_list %notin% installed.packages()[,"Package"]]
+if(length(new_packages)) install.packages(new_packages)
+
+library(knitr)
+library(haven)
+library(labelled)
+library(WDI)
+library(scales)
+library(tidyverse)
+library(reshape2)
+library(plotly)
+library(extrafont)
+font_import()
+loadfonts()
+
+```
+
+
+```{r load-data, include=FALSE}
+# Load data
+
+# first graph
+population <- WDI(country=c("AR","PY"), indicator="SP.POP.TOTL", start=2001, end=2014) %>% plyr::rename(c(iso2c="country_code",SP.POP.TOTL = "population"))
+poverty_ratio <- WDI(country=c("AR","PY"), indicator="SI.POV.DDAY", start=2001, end=2014) %>% plyr::rename(c(iso2c="country_code",SI.POV.DDAY = "poverty_ratio")) %>% dplyr::mutate(poverty_ratio = poverty_ratio/100)
+pop_poverty <- population %>% left_join(poverty_ratio, by = c("country_code","country","year")) %>% mutate (population_million = population/1000000)
+
+# second graph
+income_0_20 <- WDI(country=c("AR","PY"), indicator="SI.DST.05TH.20", start=2014, end=2014) %>% plyr::rename(c(iso2c="country_code",SI.DST.05TH.20 = "income_0_20")) %>% dplyr::mutate(income_0_20 = income_0_20/100)
+income_20_40 <- WDI(country=c("AR","PY"), indicator="SI.DST.04TH.20", start=2014, end=2014) %>% plyr::rename(c(iso2c="country_code",SI.DST.04TH.20 = "income_20_40")) %>% dplyr::mutate(income_20_40 = income_20_40/100)
+income_40_60 <- WDI(country=c("AR","PY"), indicator="SI.DST.03RD.20", start=2014, end=2014) %>% plyr::rename(c(iso2c="country_code",SI.DST.03RD.20 = "income_40_60")) %>% dplyr::mutate(income_40_60 = income_40_60/100)
+income_60_80 <- WDI(country=c("AR","PY"), indicator="SI.DST.02ND.20", start=2014, end=2014)  %>% plyr::rename(c(iso2c="country_code",SI.DST.02ND.20 = "income_60_80")) %>% dplyr::mutate(income_60_80 = income_60_80/100)
+income_80_100 <- WDI(country=c("AR","PY"), indicator="SI.DST.FRST.20", start=2014, end=2014)  %>% plyr::rename(c(iso2c="country_code",SI.DST.FRST.20 = "income_80_100")) %>% dplyr::mutate(income_80_100 = income_80_100/100)
+
+income_dist <- Reduce(function(x, y) merge(x, y, by = c("country_code","country","year"), all=TRUE), list(income_0_20,income_20_40,income_40_60,income_60_80,income_80_100)) 
+
+# third graph
+income_0_20_all <- WDI(country=c("all"), indicator="SI.DST.05TH.20", start=2014, end=2014) %>% plyr::rename(c(iso2c="country_code",SI.DST.05TH.20 = "income_0_20")) %>% dplyr::mutate(income_0_20 = income_0_20/100)
+poverty_ratio_all <- WDI(country=c("all"), indicator="SI.POV.DDAY", start=2014, end=2014) %>% plyr::rename(c(iso2c="country_code",SI.POV.DDAY = "poverty_ratio")) %>% dplyr::mutate(poverty_ratio = poverty_ratio/100)
+
+```
+
+
+
+
+# Graph I: Poverty Trend 
+
+\ 
+
+```{r first graph, echo=FALSE}
+
+# Arrange country name in right order for graphing
+pop_poverty$country <- factor(pop_poverty$country, c("Argentina", "Paraguay"), labels=c("Argentina", "Paraguay"))
+
+graph1 <- 
+  pop_poverty %>%
+  ggplot(aes(year, poverty_ratio, color = country)) + 
+  scale_color_manual(values = c("Argentina" = "steelblue4", "Paraguay" = "steelblue1", "Other Countries" = "grey80")) + 
+  geom_line(size = 1.5) + 
+  # guides(color = guide_legend(reverse = TRUE)) +
+  theme_minimal() + 
+  labs(title = "Poverty Trend in Argentina and Paraguay 2001-2014",
+       subtitle = "",
+       color = "",
+       x = "",
+       y = "Poverty Headcount Ratio at $1.90 a day (2011 PPP)") +
+  scale_x_continuous(breaks= c(2000, seq(2000,2014,2))) +
+  scale_y_continuous(expand = c(0, 0), limits = c(-0.02,0.155), labels = scales::percent_format()) +
+  theme(
+    text=element_text(family="Times New Roman"), 
+    panel.background = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_line(color = "gray50", size = 0.5),
+    panel.grid.major.x = element_blank(),
+    axis.text.y = element_text( size = 12),
+    axis.text.x = element_text(size = 10),
+    axis.ticks = element_line(colour = 'gray50'),
+    axis.ticks.length = unit(.25, "cm"),
+    axis.ticks.x = element_line(colour = "black"),
+    axis.ticks.y = element_blank(),
+    plot.title = element_text(hjust = 0.5, vjust=2.12,size = 12)) 
+
+graph1
+```
+
+\ 
+ 
+Argentina and Paraguay have both experienced generally decreasing poverty from 2001 to 2014, after peaking at approximately 14% in 2002, as measured by poverty head count ratio at $1.90/day in 2011 Purchasing Power Parity (PPP). In Argentina the poverty rate has dropped consistently since 2002, reaching 1.7% by 2014. During that same period, Paraguayans saw two spikes in 2006 and 2009, and by 2014 the poverty rate was approximately 2.7%. It is noteworthy that before 2004, Paraguay’s poverty rate was lower than Argentina’s, but since 2004 the situation has reversed with Argentina maintaining a lower rate.
+
+
+
+
+\newpage
+# Graph II: Income Distribution
+
+\ 
+
+```{r second graph, message=FALSE, warning=FALSE, echo=FALSE}
+
+# Reshape the data to long format
+income_dist_long <- melt(cbind(income_dist, ind = 'country')) %>% select(-ind) %>%
+	mutate(income_category= recode(variable, income_0_20 = "Highest 20%",
+					income_20_40 = "Second 20%",
+					income_40_60 = "Third 20%",
+					income_60_80 = "Fourth 20%",
+					income_80_100 = "Lowest 20%"))
+
+
+graph2 <- income_dist_long %>%
+ggplot(aes(x = country, y = value,fill = income_category)) + 
+    geom_bar(position = "fill",stat = "identity", width = 0.7) +
+	guides(color = guide_legend(reverse = TRUE)) +
+    theme_minimal() + 
+    labs(title = "Income Distribution in Argentina and Paraguay 2014",
+       subtitle = "",
+       color = "",
+       x = "",
+       y = "Percentage Share Held") +
+    scale_y_continuous(expand = c(0, 0), limits = c(-0.02,1.01),labels = percent_format()) + 
+    scale_fill_brewer(direction = -1, palette="Blues") +   
+    guides(fill=guide_legend(title="Income Share Held \n by % of Distribution")) +
+    theme(
+    text=element_text(family="Times New Roman"), 
+    legend.title = element_text(size = 9),
+    panel.background = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_line(color = "gray50", size = 0.5),
+    panel.grid.major.x = element_blank(),
+    axis.text.y = element_text(size = 12),
+    axis.text.x = element_text(size = 14),
+    axis.ticks = element_line(colour = 'gray50'),
+    axis.ticks.length = unit(.25, "cm"),
+    axis.ticks.x = element_line(colour = "black"),
+    axis.ticks.y = element_blank(),
+    plot.title = element_text(hjust = 0.8, vjust=2.12,size = 12))
+
+graph2
+```
+
+\ 
+
+In 2014, individuals from the top 20% of the income distribution of Paraguay held 56% of the country’s total income, compared to Argentina, where 48% of the total income went to the top 20%. The second 20% of the income distribution in both countries held a commensurate proportion of the total income, at 22% in Argentina and 19% in Paraguay. Whereas the third 20% and down from both countries held increasingly diminishing amounts of income relative to their size, with the poorest suffering the most disproportion.
+\clearpage
+
+
+
+
+
+\newpage
+# Graph III: Correlational Analysis
+
+\ 
+
+```{r third graph, message=FALSE, warning=FALSE, echo=FALSE}
+# Prepare data
+inc_poverty_all <- income_0_20_all %>% 
+	left_join(poverty_ratio_all, by = c("country_code","country","year")) %>%
+	select(-year) %>%
+	mutate(country = ifelse(country == 'Argentina','Argentina',ifelse(country == 'Paraguay', 'Paraguay', "Other Countries")))
+
+
+# Correlation coefficient
+  # cor(inc_poverty_all$income_0_20,inc_poverty_all$poverty_ratio,use = "na.or.complete") 
+  # Correlation coefficient = 0.02210042
+
+# Arrange country name in right order for graphing
+inc_poverty_all$country <- factor(inc_poverty_all$country, c("Argentina", "Paraguay","Other Countries"), labels=c("Argentina", "Paraguay","Other Countries"))
+
+graph3 <- inc_poverty_all %>%
+	ggplot(aes(x=income_0_20, y=poverty_ratio, color = country)) +
+    geom_point(shape = 19, size = 2.5) +
+    scale_color_manual(values = c("Argentina" = "steelblue4", "Paraguay" = "steelblue1", "Other Countries" = "grey80")) + 
+    theme_minimal() + 
+    labs(title = "Correlation of Income Inequality and Poverty 2014",
+       subtitle = "",
+       color = "",
+       x = "Income Share Held by Highest 20%",
+       y = "Poverty Headcount Ratio at $1.90 a day (2011 PPP)") +
+    scale_y_continuous(expand = c(0, 0), limits = c(-0.02,0.50000001),labels = percent_format()) +
+    scale_x_continuous(limits=c(0.200001, 0.581),labels = percent_format()) +
+  	theme(
+    text=element_text(family="Times New Roman"), 
+    legend.title=element_blank(),
+    panel.grid.minor.y = element_blank(),
+    axis.text.y = element_text(size = 10),
+    axis.text.x = element_text(size = 10),
+    axis.ticks = element_line(colour = 'gray50'),
+    axis.ticks.length = unit(.25, "cm"),
+    axis.ticks.x = element_line(colour = "black"),
+    axis.ticks.y = element_line(colour = "black"),
+    plot.title = element_text(hjust = 0.8, vjust=2.12,size = 12))    
+
+graph3
+```
+
+\ 
+
+Extreme income inequality is generally thought to be associated with higher poverty rate. As shown on the graph, countries with higher proportion of their income going to the top 20% of the income distribution had a greater percentage of their citizens in poverty, although the tendency is not that strong. This is confirmed by the positive correlation coefficient of about 0.022 between these two measures. As shown in Graph III, Paraguay suffers from greater income inequality and higher poverty rate compared to Argentina, a conclusion that is confirmed by the preceding two graphs. 
+
+\ 
+
+\ 
+
+# Bonus points: Please see included html files
+\clearpage
+
+```{r create interactive, message=FALSE, warning=FALSE, echo=FALSE, include = FALSE}
+# graph1 %>% ggplotly()
+# graph2 %>% ggplotly()
+# graph3 %>% ggplotly()
+
+```
+
+
+
+
+
+
+
+
+
+
